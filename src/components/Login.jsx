@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { ThemeContext } from "../context/ThemeContext";
 import { motion } from "framer-motion";
 import { Moon, Sun, Mail, Lock } from "lucide-react";
+import axiosInstance from "../api/axiosInstance.js"; // ✅ Import Axios instance
 
 const Login = () => {
   const navigate = useNavigate();
@@ -11,30 +12,66 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // Dummy credentials
-  const dummyUser = {
-    email: "doctor@example.com",
-    password: "12345",
-  };
+  const handleLogin = async (e) => {
+  e.preventDefault();
+  setError("");
+  setLoading(true);
 
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (email === dummyUser.email && password === dummyUser.password) {
-      alert("✅ Login successful! Redirecting to dashboard...");
+  try {
+    const res = await axiosInstance.post("/user/users/login", {
+      email,
+      password,
+    });
+
+    const data = res.data;
+
+    // ✅ Save token & user info
+    localStorage.setItem("access_token", data.access_token);
+    localStorage.setItem("user", JSON.stringify(data.user));
+
+    const userRole = data.user.role;
+    alert("✅ Login successful!");
+
+    // ✅ Redirect user based on role
+    if (userRole === "admin") {
       navigate("/dashboard");
+    } else if (userRole === "counselor") {
+      navigate("/dashboard/patient");
+    } else if (userRole === "user") {
+      navigate("/dashboard/reports");
     } else {
-      setError("❌ Invalid email or password");
+      navigate("/unauthorized"); // fallback safety
     }
-  };
+  } catch (err) {
+    console.error("Login error:", err);
+
+    const detail =
+      err.response?.data?.detail ||
+      "⚠️ Login failed. Please try again later.";
+
+    if (detail.includes("verify your OTP")) {
+      setError("⚠️ Please verify your email via OTP before logging in.");
+    } else if (detail.includes("Invalid email or password")) {
+      setError("❌ Invalid email or password.");
+    } else {
+      setError(detail);
+    }
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div
       className="min-h-screen flex items-center justify-center px-4 transition-all duration-500"
       style={{
-        background: theme === "light"
-          ? `linear-gradient(135deg, ${colors.background}, #e0f2fe)`
-          : `linear-gradient(135deg, #0f172a, #1e293b)`,
+        background:
+          theme === "light"
+            ? `linear-gradient(135deg, ${colors.background}, #e0f2fe)`
+            : `linear-gradient(135deg, #0f172a, #1e293b)`,
       }}
     >
       <motion.div
@@ -83,10 +120,7 @@ const Login = () => {
           <form onSubmit={handleLogin}>
             {/* Email Field */}
             <div className="mb-5 relative">
-              <Mail
-                className="absolute left-3 top-3 text-gray-400"
-                size={18}
-              />
+              <Mail className="absolute left-3 top-3 text-gray-400" size={18} />
               <input
                 type="email"
                 className="w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 outline-none transition-all"
@@ -104,10 +138,7 @@ const Login = () => {
 
             {/* Password Field */}
             <div className="mb-5 relative">
-              <Lock
-                className="absolute left-3 top-3 text-gray-400"
-                size={18}
-              />
+              <Lock className="absolute left-3 top-3 text-gray-400" size={18} />
               <input
                 type="password"
                 className="w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 outline-none transition-all"
@@ -139,13 +170,15 @@ const Login = () => {
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               type="submit"
+              disabled={loading}
               className="w-full py-2 font-semibold rounded-lg shadow-md transition-all"
               style={{
                 background: colors.primary,
                 color: "#fff",
+                opacity: loading ? 0.6 : 1,
               }}
             >
-              Sign In
+              {loading ? "Signing In..." : "Sign In"}
             </motion.button>
           </form>
 

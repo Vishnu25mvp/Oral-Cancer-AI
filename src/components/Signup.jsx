@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { ThemeContext } from "../context/ThemeContext";
 import { motion } from "framer-motion";
 import { Moon, Sun, User, Mail, Lock } from "lucide-react";
+import axiosInstance from "../api/axiosInstance"; 
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -13,20 +14,55 @@ const Signup = () => {
     email: "",
     password: "",
   });
+
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSignup = (e) => {
+  const handleSignup = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.password) {
+    setError("");
+
+    const { name, email, password } = formData;
+    if (!name || !email || !password) {
       setError("⚠️ Please fill in all required fields");
       return;
     }
-    alert("🎉 Account created successfully! Redirecting to login...");
-    navigate("/login");
+
+    setLoading(true);
+    try {
+      // ✅ Register new user with role=user
+      const res = await axiosInstance.post("/user/users/register", {
+        name,
+        email,
+        password,
+        role: "user",
+      });
+
+      const data = res.data;
+      console.log("Signup success:", data);
+
+      alert(
+        "🎉 Account created successfully! Please verify the OTP sent to your email."
+      );
+      // ✅ Redirect to OTP verification page
+      navigate("/verify-otp", { state: { email: formData.email } });
+    } catch (err) {
+      console.error("Signup error:", err);
+
+      if (err.detail?.includes("Email already registered")) {
+        setError("⚠️ Email already registered. Try logging in instead.");
+      } else if (err.detail) {
+        setError(`⚠️ ${err.detail}`);
+      } else {
+        setError("❌ Failed to create account. Please try again later.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -153,13 +189,15 @@ const Signup = () => {
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               type="submit"
+              disabled={loading}
               className="w-full py-2 font-semibold rounded-lg shadow-md transition-all"
               style={{
                 background: colors.primary,
                 color: "#fff",
+                opacity: loading ? 0.6 : 1,
               }}
             >
-              Sign Up
+              {loading ? "Creating Account..." : "Sign Up"}
             </motion.button>
           </form>
 

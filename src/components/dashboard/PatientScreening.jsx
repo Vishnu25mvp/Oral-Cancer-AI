@@ -2,63 +2,104 @@ import React, { useState, useContext } from "react";
 import { ThemeContext } from "../../context/ThemeContext";
 import DashboardLayout from "./DashboardLayout";
 import { motion } from "framer-motion";
-import { UploadCloud, User, FileText, CheckCircle } from "lucide-react";
+import { UploadCloud, User, Mail, CheckCircle } from "lucide-react";
+import axiosInstance from "../../api/axiosInstance";
 
 const PatientScreening = () => {
   const { theme, colors } = useContext(ThemeContext);
 
   const [formData, setFormData] = useState({
     name: "",
+    email: "",
     age: "",
     gender: "",
   });
 
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [report, setReport] = useState(null);
+  const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
+  // ===========================
+  // Handle input changes
+  // ===========================
   const handleChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    setSelectedFile(file);
-  };
+  const handleFileChange = (e) => setFiles([...e.target.files]);
 
+  // ===========================
+  // Submit to backend
+  // ===========================
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setMessage("");
 
-    if (!formData.name || !formData.age || !formData.gender || !selectedFile) {
-      alert("⚠️ Please fill all fields and upload an image.");
+    if (!formData.name || !formData.email || !formData.age || !formData.gender) {
+      setError("⚠️ Please fill all required fields.");
       return;
     }
 
-    setLoading(true);
-    setReport(null);
+    if (files.length === 0) {
+      setError("⚠️ Please upload at least one image.");
+      return;
+    }
 
-    // Simulate AI prediction process
-    setTimeout(() => {
-      const result = Math.random() > 0.5 ? "Cancerous" : "Normal";
-      const confidence = (Math.random() * (99 - 85) + 85).toFixed(2);
-      setReport({
-        result,
-        confidence,
-        fileName: selectedFile.name,
+    try {
+      setLoading(true);
+
+      const data = new FormData();
+      data.append("name", formData.name);
+      data.append("email", formData.email);
+      data.append("age", formData.age);
+      data.append("gender", formData.gender);
+
+      files.forEach((file) => {
+        data.append("files", file);
       });
+
+      await axiosInstance.post("/result/results/", data, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      setMessage("✅ Patient details saved successfully!");
+      setFormData({ name: "", email: "", age: "", gender: "" });
+      setFiles([]);
+    } catch (err) {
+      console.error("Patient creation error:", err);
+      setError("❌ Failed to save patient details. Try again.");
+    } finally {
       setLoading(false);
-    }, 2500);
+    }
   };
 
   return (
     <DashboardLayout>
       <div className="mb-10">
         <h1 className="text-2xl font-bold mb-2" style={{ color: colors.primary }}>
-          Patient Screening & AI Report
+          Patient Registration
         </h1>
         <p className="text-sm" style={{ color: colors.secondary }}>
-          Register patient details, upload oral image, and get AI-based analysis report.
+          Create a new patient record with details and images.
         </p>
       </div>
+
+      {/* Feedback Messages */}
+      {message && (
+        <div
+          className="mb-4 p-3 rounded-lg text-sm font-medium text-green-700 bg-green-100"
+        >
+          {message}
+        </div>
+      )}
+      {error && (
+        <div
+          className="mb-4 p-3 rounded-lg text-sm font-medium text-red-700 bg-red-100"
+        >
+          {error}
+        </div>
+      )}
 
       {/* Patient Registration Form */}
       <motion.form
@@ -69,19 +110,24 @@ const PatientScreening = () => {
         className="p-6 rounded-xl shadow-lg border grid md:grid-cols-2 gap-8"
         style={{
           background:
-            theme === "light" ? "rgba(255,255,255,0.9)" : "rgba(30,41,59,0.8)",
+            theme === "light"
+              ? "rgba(255,255,255,0.9)"
+              : "rgba(30,41,59,0.8)",
           borderColor: colors.border,
         }}
       >
-        {/* Left Column: Patient Info */}
+        {/* Left Section */}
         <div>
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2" style={{ color: colors.primary }}>
+          <h2
+            className="text-lg font-semibold mb-4 flex items-center gap-2"
+            style={{ color: colors.primary }}
+          >
             <User size={18} /> Patient Details
           </h2>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm mb-1">Full Name</label>
+              <label className="block text-sm mb-1">Full Name *</label>
               <input
                 type="text"
                 name="name"
@@ -97,7 +143,25 @@ const PatientScreening = () => {
             </div>
 
             <div>
-              <label className="block text-sm mb-1">Age</label>
+              <label className="block text-sm mb-1">Email *</label>
+              <div className="flex items-center border rounded-lg px-3 py-2">
+                <Mail size={16} color={colors.secondary} />
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="w-full bg-transparent outline-none ml-2"
+                  placeholder="john@example.com"
+                  style={{
+                    color: colors.text,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm mb-1">Age *</label>
               <input
                 type="number"
                 name="age"
@@ -113,7 +177,7 @@ const PatientScreening = () => {
             </div>
 
             <div>
-              <label className="block text-sm mb-1">Gender</label>
+              <label className="block text-sm mb-1">Gender *</label>
               <select
                 name="gender"
                 value={formData.gender}
@@ -133,10 +197,13 @@ const PatientScreening = () => {
           </div>
         </div>
 
-        {/* Right Column: Image Upload */}
+        {/* Right Section: Upload Images */}
         <div>
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2" style={{ color: colors.primary }}>
-            <UploadCloud size={18} /> Upload Oral Image
+          <h2
+            className="text-lg font-semibold mb-4 flex items-center gap-2"
+            style={{ color: colors.primary }}
+          >
+            <UploadCloud size={18} /> Upload Patient Images
           </h2>
 
           <div
@@ -144,31 +211,33 @@ const PatientScreening = () => {
             onClick={() => document.getElementById("fileInput").click()}
             style={{ borderColor: colors.border }}
           >
-            {selectedFile ? (
-              <>
-                <img
-                  src={URL.createObjectURL(selectedFile)}
-                  alt="preview"
-                  className="w-32 h-32 object-cover rounded-lg mb-3"
-                />
-                <p className="text-sm" style={{ color: colors.secondary }}>
-                  {selectedFile.name}
-                </p>
-              </>
+            {files.length > 0 ? (
+              <div className="flex flex-wrap gap-3 justify-center">
+                {Array.from(files).map((file, index) => (
+                  <img
+                    key={index}
+                    src={URL.createObjectURL(file)}
+                    alt="preview"
+                    className="w-24 h-24 object-cover rounded-lg"
+                  />
+                ))}
+              </div>
             ) : (
               <>
                 <UploadCloud size={40} className="mb-3 text-blue-500" />
                 <p className="text-sm" style={{ color: colors.secondary }}>
-                  Click to upload or drag an image here
+                  Click to upload or drag patient images here
                 </p>
               </>
             )}
+
             <input
               id="fileInput"
               type="file"
               accept="image/*"
-              onChange={handleFileChange}
+              multiple
               hidden
+              onChange={handleFileChange}
             />
           </div>
 
@@ -182,54 +251,20 @@ const PatientScreening = () => {
               background: loading ? "#94a3b8" : colors.primary,
             }}
           >
-            {loading ? "Analyzing Image..." : "Generate Report"}
+            {loading ? "Saving..." : "Save Patient"}
           </motion.button>
         </div>
       </motion.form>
 
-      {/* Report Section */}
-      {report && (
+      {/* Success Indicator */}
+      {message && (
         <motion.div
-          initial={{ opacity: 0, y: 40 }}
+          initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="mt-10 p-6 rounded-xl shadow-lg border"
-          style={{
-            background:
-              theme === "light" ? "rgba(255,255,255,0.9)" : "rgba(30,41,59,0.8)",
-            borderColor: colors.border,
-          }}
+          transition={{ duration: 0.5 }}
+          className="flex items-center justify-center gap-2 text-green-600 font-semibold mt-6"
         >
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2" style={{ color: colors.primary }}>
-            <FileText size={18} /> AI Report Summary
-          </h2>
-
-          <div className="space-y-2">
-            <p><strong>Patient:</strong> {formData.name}</p>
-            <p><strong>Age:</strong> {formData.age}</p>
-            <p><strong>Gender:</strong> {formData.gender}</p>
-            <p><strong>File:</strong> {report.fileName}</p>
-            <p>
-              <strong>Result:</strong>{" "}
-              <span
-                className={`font-bold ${
-                  report.result === "Cancerous" ? "text-red-500" : "text-green-500"
-                }`}
-              >
-                {report.result}
-              </span>
-            </p>
-            <p>
-              <strong>Confidence:</strong> {report.confidence}%
-            </p>
-          </div>
-
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            className="mt-6 flex items-center justify-center gap-2 text-green-600 font-semibold"
-          >
-            <CheckCircle size={18} /> Report Generated Successfully
-          </motion.div>
+          <CheckCircle size={18} /> {message}
         </motion.div>
       )}
     </DashboardLayout>

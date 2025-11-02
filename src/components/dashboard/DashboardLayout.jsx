@@ -9,7 +9,7 @@ const DashboardLayout = ({ children }) => {
 
   return (
     <div
-      className={`min-h-screen flex flex-col transition-all duration-500`}
+      className={`h-screen flex flex-col transition-all duration-500`}
       style={{
         background:
           theme === "light"
@@ -18,13 +18,38 @@ const DashboardLayout = ({ children }) => {
         color: colors.text,
       }}
     >
-      <div className="flex flex-1">
-        <Sidebar />
-        <div className="flex-1 flex flex-col">
-          <Header />
-          <main className="flex-1 p-6 overflow-y-auto">{children}</main>
+      {/* Sticky header at top */}
+      <Header />
+
+      {/* Main layout with sidebar and content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar - fixed height & independent scroll */}
+        <aside
+          className="w-64 h-screen sticky top-0 flex-shrink-0 overflow-y-auto border-r shadow-lg"
+          style={{
+            background:
+              theme === "light"
+                ? "rgba(255,255,255,0.9)"
+                : "rgba(30,41,59,0.85)",
+            borderColor: colors.border,
+          }}
+        >
+          <Sidebar />
+        </aside>
+
+        {/* Main content - independent scroll */}
+        <main
+          className="flex-1 flex flex-col overflow-y-auto p-6"
+          style={{
+            background:
+              theme === "light"
+                ? "rgba(255,255,255,0.6)"
+                : "rgba(15,23,42,0.7)",
+          }}
+        >
+          <div className="flex-1">{children}</div>
           <Footer />
-        </div>
+        </main>
       </div>
     </div>
   );

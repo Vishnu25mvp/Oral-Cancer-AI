@@ -1,67 +1,147 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import { ThemeContext } from "../../context/ThemeContext";
 import DashboardLayout from "./DashboardLayout";
-import { motion } from "framer-motion";
-import { FileText, Search, Download, Eye } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  FileText,
+  Search,
+  Eye,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+  X,
+  Download,
+} from "lucide-react";
+import axiosInstance, { baseURL } from "../../api/axiosInstance";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 const ReportPage = () => {
   const { theme, colors } = useContext(ThemeContext);
+  const [reports, setReports] = useState([]);
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [orderbyCol, setOrderbyCol] = useState("date");
+  const [orderbyDir, setOrderbyDir] = useState("desc");
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [viewLoading, setViewLoading] = useState(false);
 
-  // Dummy Report Data
-  const reports = [
-    {
-      id: 1,
-      patient: "Rajesh Kumar",
-      age: 45,
-      gender: "Male",
-      result: "Cancerous",
-      confidence: 96.4,
-      date: "2025-10-20",
-    },
-    {
-      id: 2,
-      patient: "Sneha Reddy",
-      age: 32,
-      gender: "Female",
-      result: "Normal",
-      confidence: 91.8,
-      date: "2025-10-21",
-    },
-    {
-      id: 3,
-      patient: "Abdul Rahman",
-      age: 50,
-      gender: "Male",
-      result: "Cancerous",
-      confidence: 94.2,
-      date: "2025-10-23",
-    },
-    {
-      id: 4,
-      patient: "Divya Patel",
-      age: 41,
-      gender: "Female",
-      result: "Normal",
-      confidence: 89.7,
-      date: "2025-10-25",
-    },
-  ];
+  // =========================
+  // Fetch Paginated Reports
+  // =========================
+  const fetchReports = async () => {
+    setLoading(true);
+    setError("");
 
-  const filteredReports = reports.filter((r) =>
-    r.patient.toLowerCase().includes(search.toLowerCase())
-  );
+    try {
+      const token = localStorage.getItem("access_token");
+      const params = { page, limit, search, orderby_col: orderbyCol, orderby_dir: orderbyDir };
+
+      const res = await axiosInstance.get("/result/results/", {
+        headers: { Authorization: `Bearer ${token}` },
+        params,
+      });
+
+      setReports(res.data.data || []);
+      setTotalPages(res.data.pages || 1);
+    } catch (err) {
+      console.error("Failed to fetch reports:", err);
+      setError("⚠️ Failed to load reports. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReports();
+  }, [page, orderbyCol, orderbyDir]);
+
+  // =========================
+  // Toggle Sort Column
+  // =========================
+  const toggleSort = (col) => {
+    if (orderbyCol === col) setOrderbyDir(orderbyDir === "asc" ? "desc" : "asc");
+    else {
+      setOrderbyCol(col);
+      setOrderbyDir("asc");
+    }
+  };
+
+  // =========================
+  // Fetch Single Report (Modal)
+  // =========================
+  const fetchReportById = async (id) => {
+    setViewLoading(true);
+    try {
+      const token = localStorage.getItem("access_token");
+      const res = await axiosInstance.get(`/result/results/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSelectedReport(res.data);
+    } catch (err) {
+      console.error("Failed to fetch report details:", err);
+      alert("⚠️ Failed to load report details.");
+    } finally {
+      setViewLoading(false);
+    }
+  };
+
+  // =========================
+  // PDF Download Handler
+  // =========================
+  const handleDownloadPDF = async () => {
+    const element = document.getElementById("report-content");
+
+    if (!element) {
+      alert("No report to download!");
+      return;
+    }
+
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`${selectedReport?.user?.name || "report"}_${selectedReport?.id}.pdf`);
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+      alert("❌ Failed to generate PDF. Try again.");
+    }
+  };
+
+  // =========================
+  // Pagination
+  // =========================
+  const nextPage = () => page < totalPages && setPage(page + 1);
+  const prevPage = () => page > 1 && setPage(page - 1);
 
   return (
     <DashboardLayout>
-      {/* Page Header */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-8">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: colors.primary }}>
             AI Detection Reports
           </h1>
           <p className="text-sm" style={{ color: colors.secondary }}>
-            View and download reports generated from AI-based oral cancer detection.
+            Review and download patient analysis results generated by AI.
           </p>
         </div>
 
@@ -81,114 +161,171 @@ const ReportPage = () => {
             style={{ color: colors.text }}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && fetchReports()}
           />
         </div>
       </div>
 
-      {/* Summary Card */}
-      <motion.div
-        whileHover={{ scale: 1.02 }}
-        className="p-6 mb-10 rounded-xl shadow-lg border flex items-center justify-between transition-all"
-        style={{
-          background:
-            theme === "light" ? "rgba(255,255,255,0.9)" : "rgba(30,41,59,0.8)",
-          borderColor: colors.border,
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <FileText size={36} color={colors.primary} />
-          <div>
-            <h2 className="text-3xl font-bold" style={{ color: colors.primary }}>
-              {filteredReports.length}
-            </h2>
-            <p className="text-sm" style={{ color: colors.secondary }}>
-              Total Reports Generated
-            </p>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Reports Table */}
+      {/* Table Section */}
       <div
         className="p-6 rounded-xl shadow-lg border overflow-x-auto"
         style={{
-          background:
-            theme === "light" ? "rgba(255,255,255,0.9)" : "rgba(30,41,59,0.8)",
+          background: theme === "light" ? "rgba(255,255,255,0.9)" : "rgba(30,41,59,0.8)",
           borderColor: colors.border,
         }}
       >
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr style={{ color: colors.primary }}>
-              <th className="border-b py-2 px-3">Patient Name</th>
-              <th className="border-b py-2 px-3">Age</th>
-              <th className="border-b py-2 px-3">Gender</th>
-              <th className="border-b py-2 px-3">Result</th>
-              <th className="border-b py-2 px-3">Confidence</th>
-              <th className="border-b py-2 px-3">Date</th>
-              <th className="border-b py-2 px-3 text-center">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredReports.length > 0 ? (
-              filteredReports.map((r) => (
-                <motion.tr
-                  key={r.id}
-                  whileHover={{ scale: 1.01 }}
-                  className="hover:bg-blue-50 dark:hover:bg-slate-700 transition"
-                >
-                  <td className="py-2 px-3">{r.patient}</td>
-                  <td className="py-2 px-3">{r.age}</td>
-                  <td className="py-2 px-3">{r.gender}</td>
-                  <td className="py-2 px-3">
-                    <span
-                      className={`font-semibold ${
-                        r.result === "Cancerous"
-                          ? "text-red-500"
-                          : "text-green-500"
-                      }`}
-                    >
-                      {r.result}
-                    </span>
-                  </td>
-                  <td className="py-2 px-3">{r.confidence}%</td>
-                  <td className="py-2 px-3">{r.date}</td>
-                  <td className="py-2 px-3 text-center flex justify-center gap-2">
-                    <button
-                      className="flex items-center gap-1 px-3 py-1 rounded-md text-sm font-medium"
-                      style={{
-                        background: colors.primary,
-                        color: "#fff",
-                      }}
-                      onClick={() => alert(`Viewing report for ${r.patient}`)}
-                    >
-                      <Eye size={14} /> View
-                    </button>
-                    <button
-                      className="flex items-center gap-1 px-3 py-1 rounded-md text-sm font-medium border"
-                      style={{
-                        borderColor: colors.border,
-                        color: colors.primary,
-                      }}
-                      onClick={() =>
-                        alert(`Downloading PDF report for ${r.patient}`)
-                      }
-                    >
-                      <Download size={14} /> PDF
-                    </button>
-                  </td>
-                </motion.tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="7" className="text-center py-4 text-gray-400">
-                  No reports found.
-                </td>
+        {loading ? (
+          <p className="text-center text-gray-400 py-10">Loading reports...</p>
+        ) : error ? (
+          <p className="text-center text-red-500 py-10">{error}</p>
+        ) : (
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr style={{ color: colors.primary }}>
+                {[{ key: "patient", label: "Patient" },
+                  { key: "age", label: "Age" },
+                  { key: "gender", label: "Gender" },
+                  { key: "result", label: "Result" },
+                  { key: "confidence", label: "Confidence" },
+                  { key: "date", label: "Date" }].map((col) => (
+                  <th
+                    key={col.key}
+                    className="border-b py-2 px-3 cursor-pointer"
+                    onClick={() => toggleSort(col.key)}
+                  >
+                    <div className="flex items-center gap-1">
+                      {col.label}
+                      {orderbyCol === col.key && (
+                        <ArrowUpDown
+                          size={14}
+                          className={orderbyDir === "asc" ? "rotate-180 transition" : "transition"}
+                        />
+                      )}
+                    </div>
+                  </th>
+                ))}
+                <th className="border-b py-2 px-3 text-center">Actions</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {reports.length > 0 ? (
+                reports.map((r) => (
+                  <motion.tr
+                    key={r.id}
+                    whileHover={{ scale: 1.01 }}
+                    className="hover:bg-blue-50 dark:hover:bg-slate-700 transition"
+                  >
+                    <td className="py-2 px-3">{r.user?.name || `User #${r.user_id}`}</td>
+                    <td className="py-2 px-3">{r.age ?? "-"}</td>
+                    <td className="py-2 px-3">{r.gender ?? "-"}</td>
+                    <td className="py-2 px-3">
+                      <span className={`font-semibold ${r.result === "Cancerous" ? "text-red-500" : "text-green-500"}`}>
+                        {r.result || "Pending"}
+                      </span>
+                    </td>
+                    <td className="py-2 px-3">{r.confidence ? `${r.confidence.toFixed(2)}%` : "-"}</td>
+                    <td className="py-2 px-3">{new Date(r.date).toLocaleDateString()}</td>
+                    <td className="py-2 px-3 text-center">
+                      <button
+                        className="flex items-center gap-1 px-3 py-1 rounded-md text-sm font-medium text-white"
+                        style={{ background: colors.primary }}
+                        onClick={() => fetchReportById(r.id)}
+                      >
+                        <Eye size={14} /> View
+                      </button>
+                    </td>
+                  </motion.tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="7" className="text-center py-6 text-gray-400">No reports found.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
+
+      {/* Modal View */}
+      <AnimatePresence>
+        {selectedReport && (
+          <motion.div
+            className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="bg-slate-900 text-white rounded-xl shadow-xl p-6 max-w-2xl w-full relative overflow-y-auto max-h-[90vh]"
+              id="report-content"
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+            >
+              <button
+                className="absolute top-3 right-3 text-gray-400 hover:text-red-500"
+                onClick={() => setSelectedReport(null)}
+              >
+                <X size={20} />
+              </button>
+
+              {viewLoading ? (
+                <p className="text-center text-gray-400 mt-10">Loading report details...</p>
+              ) : (
+                <>
+                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-white">
+                    <FileText size={20} /> Patient Report
+                  </h2>
+
+                  <div className="space-y-2 text-sm text-white">
+                    <p><strong>Patient:</strong> {selectedReport?.user?.name || `User #${selectedReport?.user_id}`}</p>
+                    <p><strong>Age:</strong> {selectedReport?.age}</p>
+                    <p><strong>Gender:</strong> {selectedReport?.gender}</p>
+                    <p><strong>Date:</strong> {new Date(selectedReport?.date).toLocaleString()}</p>
+                    <p>
+                      <strong>Result:</strong>{" "}
+                      <span
+                        className={`font-semibold ${
+                          selectedReport?.result === "Cancerous" ? "text-red-400" : "text-green-400"
+                        }`}
+                      >
+                        {selectedReport?.result || "Pending"}
+                      </span>
+                    </p>
+                    <p><strong>Confidence:</strong> {selectedReport?.confidence ? `${selectedReport.confidence}%` : "-"}</p>
+                  </div>
+
+                  {selectedReport?.images?.length > 0 && (
+                    <div className="mt-4">
+                      <h3 className="font-semibold mb-2 text-white">Images</h3>
+                      <div className="flex flex-wrap gap-3">
+                        {selectedReport.images.map((img, i) => (
+                          <img
+                            key={i}
+                            src={`${baseURL}/${img}`}
+                            alt={`Scan ${i + 1}`}
+                            className="w-32 h-32 object-cover rounded-lg border border-gray-700"
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    className="mt-6 flex items-center gap-2 px-4 py-2 rounded-md text-white font-medium"
+                    style={{ background: colors.primary }}
+                    onClick={handleDownloadPDF}
+                  >
+                    <Download size={16} /> Download Report
+                  </motion.button>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </DashboardLayout>
   );
 };
