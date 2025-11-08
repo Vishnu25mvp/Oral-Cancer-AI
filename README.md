@@ -1,16 +1,60 @@
-# React + Vite
+---
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# 🚀 How to Run React App (Simple Guide)
 
-Currently, two official plugins are available:
+### 1️⃣ Install dependencies
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+In your React project folder (where `package.json` exists), run:
 
-## React Compiler
+```bash
+npm install
+```
 
-The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
+or shorter:
 
-## Expanding the ESLint configuration
+```bash
+npm i
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+✅ This installs all the required node modules listed in `package.json`.
+
+---
+
+### 2️⃣ Run the development server
+
+After installation finishes, start the app with:
+
+```bash
+npm run dev
+```
+
+or, if you’re using **Create React App**, then use:
+
+```bash
+npm start
+```
+
+---
+
+### 3️⃣ Open your browser
+
+Once it compiles successfully, open:
+👉 **[http://localhost:3000](http://localhost:3000)**
+
+Your React app should now be running live and automatically reload on save.
+
+---
+
+### 4️⃣ (Optional) Stop the server
+
+Press **Ctrl + C** in your terminal to stop the development server.
+
+---
+
+✅ That’s it!
+
+* `npm i` → install all packages
+* `npm run dev` (or `npm start`) → run the React app locally
+
+---
+
